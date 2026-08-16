@@ -1,4 +1,4 @@
-f"""Per-channel speaker level and EQ tone controls."""
+"""Per-channel speaker level and EQ tone controls."""
 
 from __future__ import annotations
 
