@@ -1,4 +1,4 @@
-"""Per-channel speaker level and EQ tone controls."""
+f"""Per-channel speaker level and EQ tone controls."""
 
 from __future__ import annotations
 
@@ -26,10 +26,22 @@ class LevelSpec:
     fallback_max: float = 6
     step: float = 1
     unit: str | None = None
-    # Display-to-wire scale. The displayed value is `raw * scale + min`; the wire
-    # value is `(displayed - min) / scale`. Levels are 1:1 (scale 1); AV sync is
-    # stored as 10 ms steps on the wire but shown in ms (scale 10).
+    # Display-to-wire scale. The displayed value is `raw * scale + offset`; the
+    # wire value is `(displayed - offset) / scale`. Levels are 1:1 (scale 1); AV
+    # sync is stored as 10 ms steps on the wire but shown in ms (scale 10).
     scale: float = 1
+    # Override: use these instead of reading {base}_min/{base}_max live from
+    # the bar. Needed for i_woofer_level on the H7 -- confirmed by a 3-point
+    # calibration (app -15dB/0dB/+12dB against raw -9/6/18) that the bar's
+    # own reported bounds (-12/12) don't match the field's real usable range
+    # at all, let alone the app's displayed range.
+    fixed_min: float | None = None
+    fixed_max: float | None = None
+    # Override: the constant added to raw to get the displayed value.
+    # Defaults to native_min_value, which holds for every other channel, but
+    # NOT i_woofer_level: its confirmed real offset is -6, which equals
+    # neither its reported bounds (-12) nor its fixed display bounds (-15).
+    raw_offset: float | None = None
 
     @property
     def base(self) -> str:
@@ -40,7 +52,12 @@ class LevelSpec:
 # Speaker channel levels (SETTING_VIEW_INFO). Bounds are read live from the bar.
 LEVEL_SPECS: tuple[LevelSpec, ...] = (
     LevelSpec(
-        key="i_woofer_level", translation_key="woofer_level", message=MSG_SETTING
+        key="i_woofer_level",
+        translation_key="woofer_level",
+        message=MSG_SETTING,
+        fixed_min=-15,
+        fixed_max=12,
+        raw_offset=-6,
     ),
     LevelSpec(
         key="i_center_level", translation_key="center_level", message=MSG_SETTING
@@ -118,6 +135,8 @@ class LGSoundbarLevel(LGSoundbarEntity, NumberEntity):
 
     @property
     def native_min_value(self) -> float:
+        if self._spec.fixed_min is not None:
+            return self._spec.fixed_min
         # Bound keys are looked up in the SAME message namespace as the value
         # itself (self._spec.message), never a flat merge -- the bar reuses
         # e.g. "i_bass_min" for two unrelated ranges across EQ_VIEW_INFO and
@@ -131,6 +150,8 @@ class LGSoundbarLevel(LGSoundbarEntity, NumberEntity):
 
     @property
     def native_max_value(self) -> float:
+        if self._spec.fixed_max is not None:
+            return self._spec.fixed_max
         return float(
             self.coordinator.get(
                 self._spec.message, f"{self._spec.base}_max", self._spec.fallback_max
@@ -138,20 +159,27 @@ class LGSoundbarLevel(LGSoundbarEntity, NumberEntity):
         )
 
     @property
+    def _offset(self) -> float:
+        # Defaults to native_min_value (the "0-based from min" convention
+        # that holds for every channel confirmed so far), but i_woofer_level
+        # overrides this: its real offset (-6) doesn't equal either its
+        # reported bounds (-12, wrong) or its fixed display bounds (-15).
+        if self._spec.raw_offset is not None:
+            return self._spec.raw_offset
+        return self.native_min_value
+
+    @property
     def native_value(self) -> float | None:
         raw = self.coordinator.get(self._spec.message, self._spec.key)
         if raw is None:
             return None
-        # The wire value is 0-based (0 == the minimum); the displayed value is
-        # `raw * scale + min`. For levels scale is 1 and the offset is the
-        # channel min (confirmed by app capture: the woofer, min -15, sent raw 21
-        # for +6 and 0 for -15). AV sync uses scale 10 (10 ms wire steps shown in
-        # ms) with a min of 0.
+        # displayed = raw * scale + offset. For levels scale is 1. AV sync
+        # uses scale 10 (10 ms wire steps shown in ms) with an offset of 0.
         low, high = self.native_min_value, self.native_max_value
-        value = float(raw) * self._spec.scale + low
+        value = float(raw) * self._spec.scale + self._offset
         return max(low, min(high, value))
 
     async def async_set_native_value(self, value: float) -> None:
-        # Reverse of the read transform: wire = (displayed - min) / scale.
-        raw = round((value - self.native_min_value) / self._spec.scale)
+        # Reverse of the read transform: wire = (displayed - offset) / scale.
+        raw = round((value - self._offset) / self._spec.scale)
         await self.coordinator.async_set_key(self._spec.message, self._spec.key, raw)
