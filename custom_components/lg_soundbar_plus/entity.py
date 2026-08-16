@@ -11,6 +11,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN, MANUFACTURER
 from .coordinator import LGSoundbarCoordinator
+from .protocol import MSG_PRODUCT
 
 
 class LGSoundbarEntity(CoordinatorEntity[LGSoundbarCoordinator]):
@@ -23,9 +24,8 @@ class LGSoundbarEntity(CoordinatorEntity[LGSoundbarCoordinator]):
 
     @property
     def device_info(self) -> DeviceInfo:
-        data = self.coordinator.data or {}
         connections = set()
-        mac = data.get("s_dev_mac")
+        mac = self.coordinator.get(MSG_PRODUCT, "s_dev_mac")
         if mac:
             connections.add((CONNECTION_NETWORK_MAC, format_mac(mac)))
         return DeviceInfo(
@@ -33,5 +33,5 @@ class LGSoundbarEntity(CoordinatorEntity[LGSoundbarCoordinator]):
             connections=connections,
             name=self.coordinator.device_name,
             manufacturer=MANUFACTURER,
-            model=data.get("s_model_name") or "Soundbar",
+            model=self.coordinator.get(MSG_PRODUCT, "s_model_name") or "Soundbar",
         )

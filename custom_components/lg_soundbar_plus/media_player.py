@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from homeassistant.components.media_player import (
     MediaPlayerEntity,
     MediaPlayerEntityFeature,
@@ -73,6 +71,17 @@ EQUALISERS: dict[int, str] = {
     21: "Sports",
     22: "Game",
     26: "Clear Voice Pro",
+    # Confirmed 2026-08-08 on an LG H7 (not the S95TR the block above was
+    # built for) via lg_h7_control.py's EQ_MODES table -- cycled modes in
+    # the ThinQ app / IR remote while watching raw EQ_VIEW_INFO. Index 29
+    # also appears in that unit's ao_upmix_support_eq list but was never
+    # offered as a directly selectable mode in either UI -- left out here
+    # too, deliberately, on the same reasoning as the source script.
+    31: "Bass",
+    33: "Custom",
+    34: "AI Sound Pro",
+    36: "Clear Voice (Base)",
+    37: "Clear Voice (High)",
 }
 
 
@@ -113,16 +122,12 @@ class LGSoundbarMediaPlayer(LGSoundbarEntity, MediaPlayerEntity):
         self._attr_unique_id = f"{coordinator.unique_id}_media_player"
 
     @property
-    def _data(self) -> dict[str, Any]:
-        return self.coordinator.data or {}
-
-    @property
     def state(self) -> MediaPlayerState | None:
-        if not self._data:
+        if not self.coordinator.data:
             return None
         return (
             MediaPlayerState.ON
-            if self._data.get("b_powerstatus", True)
+            if self.coordinator.get(MSG_SPK, "b_powerstatus", True)
             else MediaPlayerState.OFF
         )
 
@@ -141,17 +146,17 @@ class LGSoundbarMediaPlayer(LGSoundbarEntity, MediaPlayerEntity):
 
     @property
     def volume_level(self) -> float | None:
-        vol = self._data.get("i_vol")
-        vol_max = self._data.get("i_vol_max") or 100
+        vol = self.coordinator.get(MSG_SPK, "i_vol")
+        vol_max = self.coordinator.get(MSG_SPK, "i_vol_max") or 100
         return None if vol is None else vol / vol_max
 
     @property
     def is_volume_muted(self) -> bool | None:
-        value = self._data.get("b_mute")
+        value = self.coordinator.get(MSG_SPK, "b_mute")
         return None if value is None else bool(value)
 
     async def async_set_volume_level(self, volume: float) -> None:
-        vol_max = self._data.get("i_vol_max") or 100
+        vol_max = self.coordinator.get(MSG_SPK, "i_vol_max") or 100
         await self.coordinator.async_set_key(MSG_SPK, "i_vol", round(volume * vol_max))
 
     async def async_volume_up(self) -> None:
@@ -161,11 +166,11 @@ class LGSoundbarMediaPlayer(LGSoundbarEntity, MediaPlayerEntity):
         await self._nudge_volume(-1)
 
     async def _nudge_volume(self, delta: int) -> None:
-        vol = self._data.get("i_vol")
+        vol = self.coordinator.get(MSG_SPK, "i_vol")
         if vol is None:
             return
-        vol_max = self._data.get("i_vol_max") or 100
-        vol_min = self._data.get("i_vol_min") or 0
+        vol_max = self.coordinator.get(MSG_SPK, "i_vol_max") or 100
+        vol_min = self.coordinator.get(MSG_SPK, "i_vol_min") or 0
         await self.coordinator.async_set_key(
             MSG_SPK, "i_vol", max(vol_min, min(vol_max, vol + delta))
         )
@@ -179,16 +184,20 @@ class LGSoundbarMediaPlayer(LGSoundbarEntity, MediaPlayerEntity):
     def source_list(self) -> list[str]:
         return [
             _name(FUNCTIONS, idx, "Source")
-            for idx in self._data.get("ai_func_list", [])
+            for idx in self.coordinator.get(MSG_FUNC, "ai_func_list", [])
         ]
 
     @property
     def source(self) -> str | None:
-        idx = self._data.get("i_curr_func")
+        # i_curr_func also appears in SPK_LIST_VIEW_INFO; read from
+        # FUNC_VIEW_INFO deliberately, the same message ai_func_list comes
+        # from, so the selected index always matches the list it was chosen
+        # from. See coordinator.py's class docstring for why this matters.
+        idx = self.coordinator.get(MSG_FUNC, "i_curr_func")
         return None if idx is None else _name(FUNCTIONS, idx, "Source")
 
     async def async_select_source(self, source: str) -> None:
-        for idx in self._data.get("ai_func_list", []):
+        for idx in self.coordinator.get(MSG_FUNC, "ai_func_list", []):
             if _name(FUNCTIONS, idx, "Source") == source:
                 await self.coordinator.async_set_key(MSG_FUNC, "i_curr_func", idx)
                 return
@@ -198,16 +207,19 @@ class LGSoundbarMediaPlayer(LGSoundbarEntity, MediaPlayerEntity):
     @property
     def sound_mode_list(self) -> list[str]:
         return [
-            _name(EQUALISERS, idx, "Mode") for idx in self._data.get("ai_eq_list", [])
+            _name(EQUALISERS, idx, "Mode")
+            for idx in self.coordinator.get(MSG_EQ, "ai_eq_list", [])
         ]
 
     @property
     def sound_mode(self) -> str | None:
-        idx = self._data.get("i_curr_eq")
+        # i_curr_eq also appears in SETTING_VIEW_INFO; read from EQ_VIEW_INFO
+        # deliberately -- same reasoning as source/i_curr_func above.
+        idx = self.coordinator.get(MSG_EQ, "i_curr_eq")
         return None if idx is None else _name(EQUALISERS, idx, "Mode")
 
     async def async_select_sound_mode(self, sound_mode: str) -> None:
-        for idx in self._data.get("ai_eq_list", []):
+        for idx in self.coordinator.get(MSG_EQ, "ai_eq_list", []):
             if _name(EQUALISERS, idx, "Mode") == sound_mode:
                 await self.coordinator.async_set_key(MSG_EQ, "i_curr_eq", idx)
                 return

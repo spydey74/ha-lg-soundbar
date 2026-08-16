@@ -30,26 +30,65 @@
   },
   "entity": {
     "number": {
-      "woofer_level": { "name": "Woofer level" },
-      "center_level": { "name": "Center level" },
-      "side_level": { "name": "Side level" },
-      "top_level": { "name": "Top level" },
-      "rear_level": { "name": "Rear level" },
-      "rear_side_level": { "name": "Rear side level" },
-      "rear_top_level": { "name": "Rear top level" },
-      "dialog_level": { "name": "Dialog level" },
-      "bass": { "name": "Bass" },
-      "middle": { "name": "Middle" },
-      "treble": { "name": "Treble" },
-      "av_sync": { "name": "AV sync" }
+      "woofer_level": {
+        "name": "Woofer level"
+      },
+      "center_level": {
+        "name": "Center level"
+      },
+      "side_level": {
+        "name": "Side level"
+      },
+      "top_level": {
+        "name": "Top level"
+      },
+      "rear_level": {
+        "name": "Rear level"
+      },
+      "rear_side_level": {
+        "name": "Rear side level"
+      },
+      "rear_top_level": {
+        "name": "Rear top level"
+      },
+      "dialog_level": {
+        "name": "Dialog level"
+      },
+      "bass": {
+        "name": "Bass"
+      },
+      "middle": {
+        "name": "Middle"
+      },
+      "treble": {
+        "name": "Treble"
+      },
+      "av_sync": {
+        "name": "AV sync"
+      }
     },
     "switch": {
-      "neuralx": { "name": "Neural:X" },
-      "drc": { "name": "Dynamic range control" },
-      "night_mode": { "name": "Night mode" },
-      "auto_volume": { "name": "Auto volume" },
-      "auto_power": { "name": "Auto power" },
-      "voice_feedback": { "name": "Voice feedback" }
+      "neuralx": {
+        "name": "Neural:X"
+      },
+      "drc": {
+        "name": "Dynamic range control"
+      },
+      "night_mode": {
+        "name": "Night mode"
+      },
+      "auto_volume": {
+        "name": "Auto volume"
+      },
+      "auto_power": {
+        "name": "Auto power"
+      },
+      "voice_feedback": {
+        "name": "Voice feedback"
+      },
+      "ai_upmix": {
+        "name": "AI Upmix"
+      }
     },
     "select": {
       "display_brightness": {

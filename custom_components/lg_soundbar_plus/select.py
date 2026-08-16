@@ -29,8 +29,7 @@ async def async_setup_entry(
 ) -> None:
     """Create selects for the multi-option settings the bar reports."""
     coordinator = entry.runtime_data
-    data = coordinator.data or {}
-    if DISPLAY_BRIGHTNESS_KEY in data:
+    if coordinator.get(MSG_SETTING, DISPLAY_BRIGHTNESS_KEY) is not None:
         async_add_entities([LGSoundbarDisplayBrightness(coordinator)])
 
 
@@ -47,8 +46,7 @@ class LGSoundbarDisplayBrightness(LGSoundbarEntity, SelectEntity):
 
     @property
     def current_option(self) -> str | None:
-        data = self.coordinator.data or {}
-        value = data.get(DISPLAY_BRIGHTNESS_KEY)
+        value = self.coordinator.get(MSG_SETTING, DISPLAY_BRIGHTNESS_KEY)
         return DISPLAY_BRIGHTNESS_OPTIONS.get(value) if value is not None else None
 
     async def async_select_option(self, option: str) -> None:

@@ -94,11 +94,10 @@ async def async_setup_entry(
 ) -> None:
     """Create a control for each level/tone field the bar actually reports."""
     coordinator = entry.runtime_data
-    data = coordinator.data or {}
     entities = [
         LGSoundbarLevel(coordinator, spec)
         for spec in (*LEVEL_SPECS, *TONE_SPECS, *OTHER_SPECS)
-        if spec.key in data
+        if coordinator.get(spec.message, spec.key) is not None
     ]
     async_add_entities(entities)
 
@@ -119,18 +118,28 @@ class LGSoundbarLevel(LGSoundbarEntity, NumberEntity):
 
     @property
     def native_min_value(self) -> float:
-        data = self.coordinator.data or {}
-        return float(data.get(f"{self._spec.base}_min", self._spec.fallback_min))
+        # Bound keys are looked up in the SAME message namespace as the value
+        # itself (self._spec.message), never a flat merge -- the bar reuses
+        # e.g. "i_bass_min" for two unrelated ranges across EQ_VIEW_INFO and
+        # SETTING_VIEW_INFO, so crossing namespaces here silently produces a
+        # wrong-but-plausible bound. See coordinator.py's class docstring.
+        return float(
+            self.coordinator.get(
+                self._spec.message, f"{self._spec.base}_min", self._spec.fallback_min
+            )
+        )
 
     @property
     def native_max_value(self) -> float:
-        data = self.coordinator.data or {}
-        return float(data.get(f"{self._spec.base}_max", self._spec.fallback_max))
+        return float(
+            self.coordinator.get(
+                self._spec.message, f"{self._spec.base}_max", self._spec.fallback_max
+            )
+        )
 
     @property
     def native_value(self) -> float | None:
-        data = self.coordinator.data or {}
-        raw = data.get(self._spec.key)
+        raw = self.coordinator.get(self._spec.message, self._spec.key)
         if raw is None:
             return None
         # The wire value is 0-based (0 == the minimum); the displayed value is
