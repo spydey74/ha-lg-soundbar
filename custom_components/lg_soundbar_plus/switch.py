@@ -27,6 +27,25 @@ class ToggleSpec:
     # verified `upmix` subcommand), so it needs its own message target
     # rather than the hardcoded one the original class used.
     message: str = MSG_SETTING
+    # Optional EQ-mode gating. Some toggles only apply to certain sound
+    # modes -- confirmed on the H7: EQ_VIEW_INFO's ao_upmix_support_eq lists
+    # exactly which i_curr_eq values support upmix ([0, 29, 31, 33, 36, 37]
+    # -- notably NOT 34/AI Sound Pro), and it's a static capability table,
+    # not something that changes with the current mode. When set, the
+    # entity goes `unavailable` rather than just toggleable-but-inert
+    # whenever the current mode isn't in this list. Confirmed separately:
+    # the bar does NOT clear b_upmix_enabled when you switch into an
+    # unsupported mode -- it just stops acting on it -- so this only gates
+    # `available`, never forces a write or fakes `is_on`.
+    supported_eq_list_key: str | None = None
+    supported_eq_list_item_key: str = "i_eq_index"
+    # Message/key for the CURRENT eq mode, checked against the list above.
+    # Defaults to EQ_VIEW_INFO's i_curr_eq -- the canonical source per
+    # media_player.py's sound_mode (see its comment: SETTING_VIEW_INFO
+    # carries a second, independently-stale copy of i_curr_eq under the
+    # same key name; confirmed diverging in practice, not just in theory).
+    curr_eq_message: str = MSG_EQ
+    curr_eq_key: str = "i_curr_eq"
 
 
 # Note: the bar uses ``b_night_time`` (the upstream library's wrong
@@ -64,6 +83,7 @@ TOGGLE_SPECS: tuple[ToggleSpec, ...] = (
         translation_key="ai_upmix",
         icon="mdi:upload-network",
         message=MSG_EQ,
+        supported_eq_list_key="ao_upmix_support_eq",
     ),
 )
 
@@ -98,6 +118,29 @@ class LGSoundbarToggle(LGSoundbarEntity, SwitchEntity):
     def is_on(self) -> bool | None:
         value = self.coordinator.get(self._spec.message, self._spec.key)
         return None if value is None else bool(value)
+
+    @property
+    def available(self) -> bool:
+        if not super().available:
+            return False
+        if self._spec.supported_eq_list_key is None:
+            return True
+        supported = self.coordinator.get(
+            self._spec.message, self._spec.supported_eq_list_key
+        )
+        curr_eq = self.coordinator.get(
+            self._spec.curr_eq_message, self._spec.curr_eq_key
+        )
+        if supported is None or curr_eq is None:
+            # One of these hasn't arrived from the bar yet (e.g. a startup
+            # race) -- fail open rather than hide a working entity.
+            return True
+        indices = {
+            item.get(self._spec.supported_eq_list_item_key)
+            for item in supported
+            if isinstance(item, dict)
+        }
+        return curr_eq in indices
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         await self.coordinator.async_set_key(self._spec.message, self._spec.key, True)
