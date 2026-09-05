@@ -38,7 +38,15 @@ _IV = b"'%^Ur7gy$~t+f)%@"
 
 _HEADER = 0x10
 _CONNECT_TIMEOUT = 10.0
-_MAX_BACKOFF = 30.0
+# Reconnect backoff ceiling. This device is one we WANT to detect the instant it
+# powers back on (the soundbar boots ~with the TV on a cold start), so a long
+# ceiling is actively harmful: at 30 s the client could sit idle in a backoff
+# sleep for up to 30 s after the bar is already reachable, which is exactly the
+# "soundbar on instantly but shown in HA much later" lag (2026-09-05 cold boot ->
+# the AV engine waited its whole 45 s soundbar ceiling). A few seconds is plenty
+# to avoid hammering while still catching a returning bar fast; the sleep is also
+# interruptible via poke() so a forced HA refresh reconnects immediately.
+_MAX_BACKOFF = 5.0
 
 # Message identifiers used by the protocol.
 MSG_SPK = "SPK_LIST_VIEW_INFO"
@@ -95,6 +103,8 @@ class LGSoundbarClient:
         self._send_lock = threading.Lock()
         self._closed = False
         self._available = False
+        # Set to interrupt the reconnect backoff sleep and retry now (poke()).
+        self._wake = threading.Event()
         self._thread = threading.Thread(
             target=self._run, name=f"lgsoundbar-{host}", daemon=True
         )
@@ -114,8 +124,11 @@ class LGSoundbarClient:
                 if self._closed:
                     break
                 _LOGGER.debug("%s: connection lost (%s); retrying", self.host, err)
-                time.sleep(min(backoff, _MAX_BACKOFF))
-                backoff *= 2
+                # Interruptible sleep: poke() (a forced HA refresh) fires the event
+                # to retry immediately instead of waiting out the backoff.
+                self._wake.wait(min(backoff, _MAX_BACKOFF))
+                self._wake.clear()
+                backoff = min(backoff * 2, _MAX_BACKOFF)
 
     def _open(self) -> None:
         sock = socket.create_connection((self.host, self.port), _CONNECT_TIMEOUT)
@@ -158,6 +171,17 @@ class LGSoundbarClient:
     @property
     def available(self) -> bool:
         return self._available
+
+    def poke(self) -> None:
+        """Interrupt the reconnect backoff so the next attempt happens now.
+
+        Called when Home Assistant forces a refresh (e.g. the AV engine's cold-boot
+        poll): if the background thread is sleeping between reconnect attempts, this
+        wakes it to retry immediately, so a bar that just powered on is picked up in
+        ~a connect RTT instead of after the remaining backoff. A no-op while already
+        connected (nothing is waiting on the event; it's cleared before the next sleep).
+        """
+        self._wake.set()
 
     def send(self, payload: dict) -> None:
         packet = encrypt(payload)

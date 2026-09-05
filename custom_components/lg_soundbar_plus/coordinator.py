@@ -84,6 +84,18 @@ class LGSoundbarCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 if self._client.available:
                     break
                 await asyncio.sleep(0.25)
+        elif not self._client.available:
+            # A refresh while disconnected -- e.g. the AV engine forcing an
+            # update_entity right after a cold boot. Kick an immediate reconnect
+            # (interrupting the backoff) and give it a moment, so a bar that just
+            # powered on is detected in ~a connect RTT rather than after the
+            # remaining backoff. This is what makes the engine's 2 s forced poll
+            # actually drive reconnection.
+            self._client.poke()
+            for _ in range(8):
+                if self._client.available:
+                    break
+                await asyncio.sleep(0.25)
 
         try:
             await self.hass.async_add_executor_job(self._client.request_all)
