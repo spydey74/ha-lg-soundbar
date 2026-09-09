@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.10] - 2026-09-09
+
+### Added
+- **`audio_source` / `power_status` media_player attributes.** Surfaces the
+  incoming-stream type the bar reports (`PCM` / `DOLBY AUDIO` / `NO SIGNAL`) and
+  the raw `b_powerstatus`. The media_player `on`/`ARC` state flips true the moment
+  the bar wakes, *before* eARC audio actually flows, so the AV reconcile engine
+  needs a real signal to gate its cold-start EQ/sound-mode write on (writing during
+  `NO SIGNAL` is silently rejected, leaving the wake default AI Sound Pro). Read
+  via a new message-agnostic `coordinator.find_any` since the owning temescal
+  message isn't pinned yet.
+- **Temporary** `debug_all_fields` attribute (flattened whole-cache dump) to
+  confirm the exact `s_audio_source` field name/values on a real cold boot; remove
+  once confirmed.
+
 ## [0.1.8] - 2026-06-27
 
 ### Added

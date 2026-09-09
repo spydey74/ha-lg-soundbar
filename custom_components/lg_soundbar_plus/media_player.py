@@ -131,6 +131,33 @@ class LGSoundbarMediaPlayer(LGSoundbarEntity, MediaPlayerEntity):
             else MediaPlayerState.OFF
         )
 
+    @property
+    def extra_state_attributes(self) -> dict[str, object]:
+        """Surface fields the media_player state machine doesn't model.
+
+        ``audio_source`` is the incoming-stream type the bar reports (``PCM`` /
+        ``DOLBY AUDIO`` / ``NO SIGNAL`` ...). It is the signal the AV reconcile
+        engine gates its cold-start EQ/sound-mode write on: the ``on``/``ARC``
+        state flips true the instant the bar wakes, BEFORE eARC audio actually
+        flows, so an EQ write keyed off state alone lands during ``NO SIGNAL``
+        and is silently rejected (leaving the wake default, AI Sound Pro). The
+        owning temescal message isn't pinned yet, so it's read via ``find_any``;
+        ``None`` when the bar hasn't pushed it (older firmware / not-yet-seen) --
+        the engine treats ``None`` as "can't gate" and falls back to its timer.
+
+        ``power_status`` mirrors the raw ``b_powerstatus`` the ``state`` property
+        derives ON/OFF from -- handy for debugging the wake/standby edge.
+
+        ``debug_all_fields`` is a temporary flattened dump of the whole cache so a
+        real cold boot can confirm the exact ``s_audio_source`` field name/values.
+        Remove once the field is confirmed (see coordinator.all_fields docstring).
+        """
+        return {
+            "audio_source": self.coordinator.find_any("s_audio_source"),
+            "power_status": self.coordinator.get(MSG_SPK, "b_powerstatus"),
+            "debug_all_fields": self.coordinator.all_fields(),
+        }
+
     # -- power ---------------------------------------------------------------
     # Power is driven via b_powerkey (b_powerstatus is read-only). Captured from
     # the app, b_powerkey is explicit, not a toggle: true powers on, false powers
