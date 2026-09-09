@@ -148,14 +148,14 @@ class LGSoundbarMediaPlayer(LGSoundbarEntity, MediaPlayerEntity):
         ``power_status`` mirrors the raw ``b_powerstatus`` the ``state`` property
         derives ON/OFF from -- handy for debugging the wake/standby edge.
 
-        ``debug_all_fields`` is a temporary flattened dump of the whole cache so a
-        real cold boot can confirm the exact ``s_audio_source`` field name/values.
-        Remove once the field is confirmed (see coordinator.all_fields docstring).
+        The field name ``s_audio_source`` was confirmed live on an H7 (2026-09-09);
+        it's still read via ``find_any`` rather than a pinned message because the
+        owning temescal message wasn't isolated -- the value is unambiguous across
+        the cache, so a scan is safe (see ``coordinator.find_any``).
         """
         return {
             "audio_source": self.coordinator.find_any("s_audio_source"),
             "power_status": self.coordinator.get(MSG_SPK, "b_powerstatus"),
-            "debug_all_fields": self.coordinator.all_fields(),
         }
 
     # -- power ---------------------------------------------------------------

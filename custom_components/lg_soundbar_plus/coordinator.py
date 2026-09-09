@@ -90,20 +90,6 @@ class LGSoundbarCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 return fields[key]
         return default
 
-    def all_fields(self) -> dict[str, Any]:
-        """Flattened view of every cached field across all messages.
-
-        Diagnostic only (surfaced as a soundbar attribute) so a real cold boot
-        can reveal the exact field name/values for the incoming audio stream
-        (``s_audio_source`` and friends) without another temescal-logger session.
-        Last-writer-wins on any cross-message key collision -- acceptable for a
-        read-only debug view, never use it for control.
-        """
-        merged: dict[str, Any] = {}
-        for fields in (self.data or {}).values():
-            merged.update(fields)
-        return merged
-
     async def _async_update_data(self) -> dict[str, dict[str, Any]]:
         if self._client is None:
             self._client = LGSoundbarClient(

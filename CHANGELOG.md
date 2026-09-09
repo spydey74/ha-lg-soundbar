@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.11] - 2026-09-09
+
+### Removed
+- **Temporary `debug_all_fields` attribute** (and `coordinator.all_fields`). The
+  `s_audio_source` field name was confirmed live on an H7, so the whole-cache dump
+  is no longer needed — and it bloated every soundbar row in the recorder DB. The
+  `audio_source` / `power_status` attributes stay.
+
 ## [0.1.10] - 2026-09-09
 
 ### Added
