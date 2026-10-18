@@ -11,7 +11,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN, MANUFACTURER
 from .coordinator import LGSoundbarCoordinator
-from .protocol import MSG_PRODUCT
+from .protocol import MSG_PRODUCT, MSG_UPDATE
 
 
 class LGSoundbarEntity(CoordinatorEntity[LGSoundbarCoordinator]):
@@ -34,4 +34,7 @@ class LGSoundbarEntity(CoordinatorEntity[LGSoundbarCoordinator]):
             name=self.coordinator.device_name,
             manufacturer=MANUFACTURER,
             model=self.coordinator.get(MSG_PRODUCT, "s_model_name") or "Soundbar",
+            sw_version=(self.coordinator.get(MSG_UPDATE, "o_system_ver") or {}).get(
+                "s_main"
+            ),
         )
